@@ -1,12 +1,42 @@
-# Parallel Computing - Assignment 1
+CXX      ?= g++
+MPICXX   ?= mpicxx
+BASE     = -O3 -Wall -Wextra -std=c++17 -Iinclude
+SRC      = src/matrix.cpp src/algorithms.cpp src/bench_main.cpp
 
-## Overview
-Matrix multiplication implementations and benchmarks for:
-1. Naive algorithm (Sequential, OpenMP, MPI, Hybrid MPI + OpenMP)
-2. Strassen algorithm (Sequential, OpenMP, MPI, Hybrid MPI + OpenMP)
+ifeq ($(OS),Windows_NT)
+    EXT = .exe
+    RM  = del /f /q
+else
+    EXT =
+    RM  = rm -f
+endif
 
-## Directory Structure
-- `include/`: Header files (`matrix.h`, `timer.h`, `csvLogger.h`)
-- `src/`: Core implementation files (`matrix.cpp`)
-- `test/`: Verification and unit tests (`test_matrix.cpp`)
-- `Makefile`: Build configuration
+all: bin/bench_seq$(EXT) bin/bench_omp$(EXT) test_matrix$(EXT)
+mpi: bin/bench_mpi$(EXT) bin/bench_hybrid$(EXT)
+everything: all mpi
+
+bin:
+	mkdir -p bin
+
+bin/bench_seq$(EXT): $(SRC) | bin
+	$(CXX) $(BASE) -Wno-unknown-pragmas $(SRC) -o $@
+
+bin/bench_omp$(EXT): $(SRC) | bin
+	$(CXX) $(BASE) -fopenmp $(SRC) -o $@
+
+bin/bench_mpi$(EXT): $(SRC) | bin
+	$(MPICXX) $(BASE) -DUSE_MPI -Wno-unknown-pragmas $(SRC) -o $@
+
+bin/bench_hybrid$(EXT): $(SRC) | bin
+	$(MPICXX) $(BASE) -DUSE_MPI -fopenmp $(SRC) -o $@
+
+test_matrix$(EXT): src/matrix.cpp src/algorithms.cpp test/test_matrix.cpp
+	$(CXX) $(BASE) -fopenmp $^ -o $@
+
+test: test_matrix$(EXT)
+	./test_matrix$(EXT)
+
+clean:
+	$(RM) test_matrix$(EXT) benchmark_test.csv bin/bench_*
+
+.PHONY: all mpi everything test clean
