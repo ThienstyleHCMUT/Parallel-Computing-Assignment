@@ -48,4 +48,9 @@ public:
 bool are_matrices_equal(const Matrix& A, const Matrix& B, double tol = 1e-5);
 bool freivalds_verify(const Matrix& A, const Matrix& B, const Matrix& C, int iterations = 5, double tol = 1e-5);
 
+Matrix multiplyNaive(const Matrix& matrixA, const Matrix& matrixB);
+Matrix multiplyStrassen(const Matrix& matrixA, const Matrix& matrixB, size_t threshold = 64);
+Matrix multiplyNaiveOpenMP(const Matrix& matrixA, const Matrix& matrixB, int numThreads = 0);
+Matrix multiplyStrassenOpenMP(const Matrix& matrixA, const Matrix& matrixB, size_t threshold = 64, int numThreads = 0);
+
 #endif
