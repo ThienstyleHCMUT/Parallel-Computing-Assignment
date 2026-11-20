@@ -1,51 +1,56 @@
-CXX = g++
-MPICXX = mpic++
-
-CXXFLAGS = -O3 -Wall -Wextra -std=c++17 -Iinclude
-OMPFLAGS = -fopenmp
-
-COMMON_SRC = src/matrix.cpp src/algorithms.cpp src/bench_main.cpp
+CXX      ?= g++
+MPICXX   ?= mpicxx
+BASE     = -O3 -Wall -Wextra -std=c++17 -Iinclude
+SRC      = src/matrix.cpp src/algorithms.cpp src/bench_main.cpp
+TEST_SRC = src/matrix.cpp src/algorithms.cpp src/test_strassen.cpp
 
 ifeq ($(OS),Windows_NT)
-    TARGET = test_matrix.exe
-    TARGET_MPI = test_mpi.exe
-    RM = del /f /q
+    EXT = .exe
+    RM  = del /f /q
 else
-    TARGET = test_matrix
-    TARGET_MPI = test_mpi
-    RM = rm -f
+    EXT =
+    RM  = rm -f
 endif
 
-.PHONY: all clean
+all: bin/bench_seq$(EXT) bin/bench_omp$(EXT) test_matrix$(EXT)
+mpi: bin/bench_mpi$(EXT) bin/bench_hybrid$(EXT)
+everything: all mpi
 
-# Default target
-all: $(TARGET)
+# root-level copies used by scripts/benchmark.slurm (make bench_seq bench_omp bench_mpi bench_hybrid)
+bench_seq bench_omp bench_mpi bench_hybrid: %: bin/%$(EXT)
+	cp $< $@
 
-# Sequential benchmark
-bench_seq: $(COMMON_SRC)
-	$(CXX) $(CXXFLAGS) -Wno-unknown-pragmas $^ -o $@
+bin:
+	mkdir -p bin
 
-# OpenMP benchmark
-bench_omp: $(COMMON_SRC)
-	$(CXX) $(CXXFLAGS) $(OMPFLAGS) $^ -o $@
+bin/bench_seq$(EXT): $(SRC) | bin
+	$(CXX) $(BASE) -Wno-unknown-pragmas $(SRC) -o $@
 
-# MPI benchmark
-bench_mpi: $(COMMON_SRC)
-	$(MPICXX) $(CXXFLAGS) -Wno-unknown-pragmas -DUSE_MPI $^ -o $@
+bin/bench_omp$(EXT): $(SRC) | bin
+	$(CXX) $(BASE) -fopenmp $(SRC) -o $@
 
-# Hybrid MPI + OpenMP benchmark
-bench_hybrid: $(COMMON_SRC)
-	$(MPICXX) $(CXXFLAGS) $(OMPFLAGS) -DUSE_MPI $^ -o $@
+bin/bench_mpi$(EXT): $(SRC) | bin
+	$(MPICXX) $(BASE) -DUSE_MPI -Wno-unknown-pragmas $(SRC) -o $@
 
-# Matrix unit test
-$(TARGET): src/matrix.cpp test/test_matrix.cpp
-	$(CXX) $(CXXFLAGS) $^ -o $@
+bin/bench_hybrid$(EXT): $(SRC) | bin
+	$(MPICXX) $(BASE) -DUSE_MPI -fopenmp $(SRC) -o $@
 
-# MPI sanity test
-test_mpi: src/matrix.cpp test/test_mpi.cpp
-	$(MPICXX) $(CXXFLAGS) $^ -o $(TARGET_MPI)
+bin/test_strassen_seq$(EXT): $(TEST_SRC) | bin
+	$(CXX) $(BASE) -Wno-unknown-pragmas $(TEST_SRC) -o $@
+
+bin/test_strassen_omp$(EXT): $(TEST_SRC) | bin
+	$(CXX) $(BASE) -fopenmp $(TEST_SRC) -o $@
+
+test_matrix$(EXT): src/matrix.cpp src/algorithms.cpp test/test_matrix.cpp
+	$(CXX) $(BASE) -fopenmp $^ -o $@
+
+tests: bin/test_strassen_seq$(EXT) bin/test_strassen_omp$(EXT)
+
+test: tests
+	./bin/test_strassen_seq$(EXT)
+	./bin/test_strassen_omp$(EXT)
 
 clean:
-	$(RM) $(TARGET) $(TARGET_MPI) \
-		bench_seq bench_omp bench_mpi bench_hybrid \
-		benchmark_test.csv
+	$(RM) test_matrix$(EXT) benchmark_test.csv bin/bench_* bin/test_strassen_* bench_seq bench_omp bench_mpi bench_hybrid
+
+.PHONY: all mpi everything tests test clean

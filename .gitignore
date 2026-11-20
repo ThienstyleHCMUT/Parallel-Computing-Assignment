@@ -20,3 +20,9 @@ test_matrix
 .idea/
 *.swp
 *~
+
+bin/
+bench_seq
+bench_omp
+bench_mpi
+bench_hybrid
